@@ -1,4 +1,5 @@
 import argparse
+import math
 import struct
 from PIL import Image
 import sys
@@ -84,6 +85,48 @@ def image_to_ascii(image_path, max_width=80, max_height=24):
 
     return '\n'.join(ascii_image)
 
+
+def image_to_ascii_detail(image_path, max_width=80, max_height=24,
+                          charset=1):
+    img = Image.open(image_path).convert('L')
+    width, height = img.size
+
+    # Scaling calculation
+    aspect_ratio = width / height
+    scale_width = min(max_width, width)
+    scale_height = min(max_height, int(scale_width / aspect_ratio))
+
+    if scale_height > max_height:
+        scale_height = max_height
+        scale_width = int(scale_height * aspect_ratio)
+
+    # High-quality resampling
+    img = img.resize((scale_width, scale_height), Image.LANCZOS)
+
+    char_sets = [
+        '@%#*+=-:. ',  # Standard
+        '$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^`\'. ',
+        # Detailed
+        '█▓▒░ ',  # Block characters
+        ' .:-=+*#%@',  # Reversed
+    ]
+
+    ascii_chars = char_sets[min(charset, len(char_sets) - 1)]
+    pixels = list(img.getdata())
+
+    ascii_art = []
+    for y in range(scale_height):
+        line = ''
+        for x in range(scale_width):
+            pixel = pixels[y * scale_width + x]
+            # Какой-то корректор гаммы, сложнааа
+            gamma_corrected = math.pow(pixel / 255.0, 1.5)
+            char_index = int(gamma_corrected * (len(ascii_chars) - 1))
+            line += ascii_chars[max(0, min(len(ascii_chars) - 1, char_index))]
+        ascii_art.append(line)
+
+    return '\n'.join(ascii_art)
+
 def main():
     parser = argparse.ArgumentParser(
         description="JPEG File Parser - Analyzes JPEG files, displays detailed header information, and renders images as ASCII art in the terminal.",
@@ -108,7 +151,7 @@ def main():
     if not args.headers_only:
         # Display image as ASCII
         try:
-            ascii_art = image_to_ascii(args.file)
+            ascii_art = image_to_ascii_detail(args.file, charset=3)
             print("\nImage (ASCII representation):")
             print(ascii_art)
         except Exception as e:
