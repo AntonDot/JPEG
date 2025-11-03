@@ -1,9 +1,19 @@
 import argparse
 import math
 import struct
-from PIL import Image
+from PIL import Image, ImageTk
 import sys
 import os
+import tkinter as tk
+from tkinter import ttk
+
+# Try to import matplotlib
+try:
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
 
 def parse_jpeg_headers(file_path):
     """Parse JPEG file headers and return a dictionary of markers."""
@@ -41,6 +51,7 @@ def parse_jpeg_headers(file_path):
 
     return headers
 
+
 def print_headers(headers):
     """Print detailed header information."""
     for marker, info in headers.items():
@@ -55,6 +66,7 @@ def print_headers(headers):
             print(f"  Width: {info['width']} pixels")
         if 'data' in info:
             print(f"  Data: {info['data'][:50]}...")  # Show first 50 bytes
+
 
 def image_to_ascii(image_path, max_width=80, max_height=24):
     """Convert image to ASCII art."""
@@ -127,35 +139,104 @@ def image_to_ascii_detail(image_path, max_width=80, max_height=24,
 
     return '\n'.join(ascii_art)
 
+
+def show_histogram_ui(file_path):
+    """Displays a UI with the image and its histogram."""
+    if not MATPLOTLIB_AVAILABLE:
+        print("Error: Matplotlib is required for the histogram UI. Please install it using 'pip install matplotlib'")
+        sys.exit(1)
+
+    root = tk.Tk()
+    root.title(f"Image and Histogram - {os.path.basename(file_path)}")
+
+    # Main frame
+    main_frame = ttk.Frame(root)
+    main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    # Left frame for histogram
+    left_frame = ttk.Frame(main_frame)
+    left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    # Right frame for image
+    right_frame = ttk.Frame(main_frame)
+    right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(10, 0))
+
+    # --- Image Display ---
+    try:
+        img = Image.open(file_path)
+        # Resize for display
+        img.thumbnail((600, 600), Image.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+        image_label = ttk.Label(right_frame, image=photo)
+        image_label.pack(anchor=tk.CENTER, expand=True)
+        image_label.image = photo  # Keep a reference
+    except Exception as e:
+        ttk.Label(right_frame, text=f"Error loading image:\n{e}").pack()
+        root.mainloop()
+        return
+
+    # --- Histogram Display ---
+    fig = Figure(figsize=(5, 7), dpi=100)
+    canvas = FigureCanvasTkAgg(fig, master=left_frame)
+    canvas_widget = canvas.get_tk_widget()
+    canvas_widget.pack(fill=tk.BOTH, expand=True)
+
+    # Overall Histogram
+    ax_overall = fig.add_subplot(4, 1, 1)
+    hist_overall = img.convert('L').histogram()
+    ax_overall.plot(hist_overall)
+    ax_overall.set_title("Overall (Luminosity)")
+    ax_overall.grid(True)
+
+    # Channel Histograms
+    if img.mode == 'RGB':
+        colors = ('red', 'green', 'blue')
+        channels = img.split()
+        for i, (channel, color) in enumerate(zip(channels, colors)):
+            ax = fig.add_subplot(4, 1, i + 2)
+            ax.plot(channel.histogram(), color=color)
+            ax.set_title(f"{color.capitalize()} Channel")
+            ax.grid(True)
+    
+    fig.tight_layout()
+    canvas.draw()
+
+    root.mainloop()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="JPEG File Parser - Analyzes JPEG files, displays detailed header information, and renders images as ASCII art in the terminal.",
-        epilog="Examples:\n  python main.py image.jpg\n  python main.py image.jpg --headers-only\n  python main.py -h"
+        epilog="Examples:\n  python main.py image.jpg\n  python main.py image.jpg --headers-only\n  python main.py image.jpg --histogram"
     )
     parser.add_argument('file', help='Path to the JPEG file to parse')
     parser.add_argument('--headers-only', action='store_true', help='Display only the JPEG headers without rendering the image as ASCII art')
+    parser.add_argument('--histogram', action='store_true', help='Display a UI with the image and its histogram')
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
         print(f"Error: File '{args.file}' not found.")
         sys.exit(1)
 
-    # Parse headers
-    try:
-        headers = parse_jpeg_headers(args.file)
-        print_headers(headers)
-    except Exception as e:
-        print(f"Error parsing headers: {e}")
-        sys.exit(1)
-
-    if not args.headers_only:
-        # Display image as ASCII
+    if args.histogram:
+        show_histogram_ui(args.file)
+    else:
+        # Parse headers
         try:
-            ascii_art = image_to_ascii_detail(args.file, charset=3)
-            print("\nImage (ASCII representation):")
-            print(ascii_art)
+            headers = parse_jpeg_headers(args.file)
+            print_headers(headers)
         except Exception as e:
-            print(f"Error displaying image: {e}")
+            print(f"Error parsing headers: {e}")
+            sys.exit(1)
+
+        if not args.headers_only:
+            # Display image as ASCII
+            try:
+                ascii_art = image_to_ascii_detail(args.file, charset=3)
+                print("\nImage (ASCII representation):")
+                print(ascii_art)
+            except Exception as e:
+                print(f"Error displaying image: {e}")
 
 if __name__ == "__main__":
     main()
