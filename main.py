@@ -11,9 +11,11 @@ from tkinter import ttk
 try:
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
+
 
 def parse_jpeg_headers(file_path):
     """Parse JPEG file headers and return a dictionary of markers."""
@@ -31,23 +33,33 @@ def parse_jpeg_headers(file_path):
                 break
             marker_type = marker[1]
             if marker_type == 0xD9:  # EOI
-                headers['EOI'] = {'value': '0xFFD9', 'description': 'End of Image'}
+                headers['EOI'] = {'value': '0xFFD9',
+                                  'description': 'End of Image'}
                 break
             length = struct.unpack('>H', f.read(2))[0]
             data = f.read(length - 2)
 
             # Interpret common markers
             if marker_type == 0xE0:  # APP0
-                headers['APP0'] = {'value': f'0xFFE0, length={length}', 'description': 'JFIF Application Segment', 'data': data}
+                headers['APP0'] = {'value': f'0xFFE0, length={length}',
+                                   'description': 'JFIF Application Segment',
+                                   'data': data}
             elif marker_type == 0xC0:  # SOF0
                 precision, height, width = struct.unpack('>BHH', data[:5])
-                headers['SOF0'] = {'value': f'0xFFC0, length={length}', 'description': 'Start of Frame (Baseline DCT)', 'precision': precision, 'height': height, 'width': width}
+                headers['SOF0'] = {'value': f'0xFFC0, length={length}',
+                                   'description': 'Start of Frame (Baseline DCT)',
+                                   'precision': precision, 'height': height,
+                                   'width': width}
             elif marker_type == 0xC4:  # DHT
-                headers['DHT'] = {'value': f'0xFFC4, length={length}', 'description': 'Define Huffman Table'}
+                headers['DHT'] = {'value': f'0xFFC4, length={length}',
+                                  'description': 'Define Huffman Table'}
             elif marker_type == 0xDA:  # SOS
-                headers['SOS'] = {'value': f'0xFFDA, length={length}', 'description': 'Start of Scan'}
+                headers['SOS'] = {'value': f'0xFFDA, length={length}',
+                                  'description': 'Start of Scan'}
             else:
-                headers[f'Marker 0xFF{marker_type:02X}'] = {'value': f'0xFF{marker_type:02X}, length={length}', 'description': 'Unknown or other marker'}
+                headers[f'Marker 0xFF{marker_type:02X}'] = {
+                    'value': f'0xFF{marker_type:02X}, length={length}',
+                    'description': 'Unknown or other marker'}
 
     return headers
 
@@ -92,7 +104,8 @@ def image_to_ascii(image_path, max_width=80, max_height=24):
 
     ascii_image = []
     for i in range(new_height):
-        row = ''.join(ascii_chars[pixel // 32] for pixel in pixels[i*new_width:(i+1)*new_width])
+        row = ''.join(ascii_chars[pixel // 32] for pixel in
+                      pixels[i * new_width:(i + 1) * new_width])
         ascii_image.append(row)
 
     return '\n'.join(ascii_image)
@@ -143,7 +156,8 @@ def image_to_ascii_detail(image_path, max_width=80, max_height=24,
 def show_histogram_ui(file_path):
     """Displays a UI with the image and its histogram."""
     if not MATPLOTLIB_AVAILABLE:
-        print("Error: Matplotlib is required for the histogram UI. Please install it using 'pip install matplotlib'")
+        print(
+            "Error: Matplotlib is required for the histogram UI. Please install it using 'pip install matplotlib'")
         sys.exit(1)
 
     root = tk.Tk()
@@ -169,7 +183,7 @@ def show_histogram_ui(file_path):
         photo = ImageTk.PhotoImage(img)
         image_label = ttk.Label(right_frame, image=photo)
         image_label.pack(anchor=tk.CENTER, expand=True)
-        image_label.image = photo  # Keep a reference
+        image_label.image = photo
     except Exception as e:
         ttk.Label(right_frame, text=f"Error loading image:\n{e}").pack()
         root.mainloop()
@@ -197,7 +211,7 @@ def show_histogram_ui(file_path):
             ax.plot(channel.histogram(), color=color)
             ax.set_title(f"{color.capitalize()} Channel")
             ax.grid(True)
-    
+
     fig.tight_layout()
     canvas.draw()
 
@@ -210,8 +224,10 @@ def main():
         epilog="Examples:\n  python main.py image.jpg\n  python main.py image.jpg --headers-only\n  python main.py image.jpg --histogram"
     )
     parser.add_argument('file', help='Path to the JPEG file to parse')
-    parser.add_argument('--headers-only', action='store_true', help='Display only the JPEG headers without rendering the image as ASCII art')
-    parser.add_argument('--histogram', action='store_true', help='Display a UI with the image and its histogram')
+    parser.add_argument('--headers-only', action='store_true',
+                        help='Display only the JPEG headers without rendering the image as ASCII art')
+    parser.add_argument('--histogram', action='store_true',
+                        help='Display a UI with the image and its histogram')
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
@@ -237,6 +253,7 @@ def main():
                 print(ascii_art)
             except Exception as e:
                 print(f"Error displaying image: {e}")
+
 
 if __name__ == "__main__":
     main()
